@@ -1,0 +1,7 @@
+keyboard
+Pillow
+psutil
+pygame
+pystray
+pywin32
+win11toast
