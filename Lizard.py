@@ -1,16 +1,16 @@
 # pyinstaller Lizard.py --onefile --noconsole --add-data "lizard.gif;." --add-data "lizard.mp3;."
 from pystray import Icon, MenuItem, Menu
 from win11toast import toast_async
-from PIL import Image
 import win32com.client
+from PIL import Image
 import threading
 import keyboard
 import argparse
 import asyncio
 import psutil
 import pygame
-import os
 import sys
+import os
 
 parser = argparse.ArgumentParser()
 current_process = psutil.Process(os.getpid())
@@ -23,6 +23,8 @@ def resource_path(name: str) -> str:
     return os.path.join(os.path.dirname(__file__), name)
 
 MuteSound = False
+SFX = None
+space_down = False
 
 if args.isstartup is True:
     import time
@@ -69,10 +71,10 @@ def create_image():
     return image
 
 def play_sound():
-    global MuteSound
-    if not MuteSound:
-        pygame.mixer.music.play()
-        
+    global MuteSound, SFX
+    if not MuteSound and SFX is not None:
+        SFX.play()
+
 def toggle_mute(icon, item):
     global MuteSound
     MuteSound = not MuteSound
@@ -80,14 +82,17 @@ def toggle_mute(icon, item):
 
 def quit_app():
     print("Exiting task")
-    pygame.mixer.music.stop()
-    pygame.quit()
+    try:
+        pygame.mixer.stop()
+        pygame.mixer.quit()
+    except:
+        pass
     current_process.kill()
 
 def setup_tray():
     print("Setting up windows tray icon")
     menu = Menu(
-        MenuItem('Play Sound (Space)', action=lambda icon, item: play_sound()),    
+        MenuItem('Play Sound (Space)', action=lambda icon, item: play_sound()),
         MenuItem('Toggle Startup', toggle_startup, checked=lambda item: os.path.exists(shortcut_path)),
         MenuItem('Mute Sound', toggle_mute, checked=lambda item: MuteSound),
         MenuItem('Quit', action=quit_app)
@@ -97,14 +102,26 @@ def setup_tray():
 
 print("initializing pygame audio")
 pygame.mixer.init()
-
-pygame.mixer.music.load(resource_path("lizard.mp3"))
+pygame.mixer.set_num_channels(32)
+SFX = pygame.mixer.Sound(resource_path("lizard.mp3"))
 
 print("Creating hotkey")
-keyboard.add_hotkey('Space', play_sound)
+
+def on_space_down(e):
+    global space_down
+    if not space_down:
+        space_down = True
+        play_sound()
+
+def on_space_up(e):
+    global space_down
+    space_down = False
+
+keyboard.on_press_key('space', on_space_down)
+keyboard.on_release_key('space', on_space_up)
 
 if (__name__ == "__main__"):
     asyncio.run(starttoast())
     tray_thread = threading.Thread(target=setup_tray)
     tray_thread.start()
-    print("Lizard is ready! Press Alt+f4 to play sound.")
+    print("Lizard is ready! Press Space to play sound.")
