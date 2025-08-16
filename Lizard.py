@@ -23,7 +23,9 @@ def resource_path(name: str) -> str:
     return os.path.join(os.path.dirname(__file__), name)
 
 MuteSound = False
+AllowOverlap = True
 SFX = None
+CH = None
 space_down = False
 
 if args.isstartup is True:
@@ -71,13 +73,26 @@ def create_image():
     return image
 
 def play_sound():
-    global MuteSound, SFX
+    global MuteSound, SFX, AllowOverlap, CH
     if not MuteSound and SFX is not None:
-        SFX.play()
+        if AllowOverlap:
+            SFX.play()
+        else:
+            if CH is not None and CH.get_busy():
+                CH.stop()
+            if CH is not None:
+                CH.play(SFX)
+            else:
+                SFX.play()
 
 def toggle_mute(icon, item):
     global MuteSound
     MuteSound = not MuteSound
+    icon.update_menu()
+
+def toggle_overlap(icon, item):
+    global AllowOverlap
+    AllowOverlap = not AllowOverlap
     icon.update_menu()
 
 def quit_app():
@@ -94,6 +109,7 @@ def setup_tray():
     menu = Menu(
         MenuItem('Play Sound (Space)', action=lambda icon, item: play_sound()),
         MenuItem('Toggle Startup', toggle_startup, checked=lambda item: os.path.exists(shortcut_path)),
+        MenuItem('Allow Overlap', toggle_overlap, checked=lambda item: AllowOverlap),
         MenuItem('Mute Sound', toggle_mute, checked=lambda item: MuteSound),
         MenuItem('Quit', action=quit_app)
     )
@@ -103,6 +119,7 @@ def setup_tray():
 print("initializing pygame audio")
 pygame.mixer.init()
 pygame.mixer.set_num_channels(32)
+CH = pygame.mixer.Channel(0)
 SFX = pygame.mixer.Sound(resource_path("lizard.mp3"))
 
 print("Creating hotkey")
